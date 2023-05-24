@@ -1,9 +1,5 @@
 import { OpenAIChatMessage, OpenAIConfig } from "./OpenAI.types";
-import {
-  createParser,
-  ParsedEvent,
-  ReconnectInterval,
-} from "eventsource-parser";
+import { SSEParser } from "./sse-parser";
 
 export const defaultConfig = {
   model: "gpt-3.5-turbo",
@@ -19,59 +15,72 @@ export type OpenAIRequest = {
 } & OpenAIConfig;
 
 export const getOpenAICompletion = async (
-  token: string,
   payload: OpenAIRequest
 ) => {
   const encoder = new TextEncoder();
   const decoder = new TextDecoder();
 
-  const response = await fetch("https://api.openai.com/v1/chat/completions", {
+  const apiEndpoint = process.env.apiEndpoint;
+  const apiKey = process.env.apiKey;
+
+  const response = await fetch(apiEndpoint as string, {
     headers: {
-      Authorization: `Bearer ${token}`,
+      "api-key": apiKey as string,
       "Content-Type": "application/json",
     },
     method: "POST",
     body: JSON.stringify(payload),
   });
-
+  
   // Check for errors
   if (!response.ok) {
     throw new Error(await response.text());
   }
 
-  let counter = 0;
-  const stream = new ReadableStream({
-    async start(controller) {
-      function onParse(event: ParsedEvent | ReconnectInterval) {
-        if (event.type === "event") {
-          const data = event.data;
-          // https://beta.openai.com/docs/api-reference/completions/create#completions/create-stream
-          if (data === "[DONE]") {
-            controller.close();
-            return;
+  const source: UnderlyingDefaultSource<Uint8Array> = {
+    start: async (controller) => {
+      if (response && response.body && response.ok) {
+        const reader = response.body.getReader();
+        try {
+          const SSEEvents = {
+            onError: (error: any) => {
+              controller.error(error);
+            },
+            onData: (data: string) => {
+              const queue = new TextEncoder().encode(data);
+              controller.enqueue(queue);
+            },
+            onComplete: () => {
+              controller.close();
+            },
+          };
+      
+          const decoder = new TextDecoder();
+          const sseParser = new SSEParser(SSEEvents);
+      
+          while (true) {
+            const { value, done } = await reader.read();
+            if (done) break;
+      
+            const chunkValue = decoder.decode(value);
+            sseParser.parseSSE(chunkValue);
           }
-
-          try {
-            const json = JSON.parse(data);
-            const text = json.choices[0].delta?.content || "";
-            if (counter < 2 && (text.match(/\n/) || []).length) {
-              return;
-            }
-            const queue = encoder.encode(text);
-            controller.enqueue(queue);
-            counter++;
-          } catch (e) {
-            controller.error(e);
-          }
+        } catch (e) {
+          controller.error(e);
+        } finally {
+          controller.close();
+          reader.releaseLock();
+        }
+      } else {
+        if (!response.ok) {
+          controller.error(response.statusText);
+        } else {
+          controller.error("No response body");
         }
       }
-
-      const parser = createParser(onParse);
-      for await (const chunk of response.body as any) {
-        parser.feed(decoder.decode(chunk));
-      }
     },
-  });
+  };
 
-  return stream;
+  return new ReadableStream(source);
 };
+

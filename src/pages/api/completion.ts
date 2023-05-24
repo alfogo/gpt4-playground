@@ -29,10 +29,10 @@ export default async function handler(
     return new Response("Missing messages", { status: 400 });
   }
 
-  const token = req.headers.get("Authorization")?.split(" ")[1];
+  /*const token = req.headers.get("Authorization")?.split(" ")[1];
   if (!token) {
     return new Response("Missing token", { status: 401 });
-  }
+  }*/
 
   const config = {
     model: model || defaultConfig.model,
@@ -51,7 +51,7 @@ export default async function handler(
   };
 
   try {
-    const stream = await getOpenAICompletion(token, payload);
+    const stream = await getOpenAICompletion(/*token,*/ payload);
     return new Response(stream);
   } catch (e: any) {
     return new Response(e.message || "Error fetching response.", {

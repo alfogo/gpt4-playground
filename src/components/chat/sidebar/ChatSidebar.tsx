@@ -28,7 +28,7 @@ export default function ChatSidebar({}: Props) {
         <Conversations />
 
         <div className="flex flex-col gap-y-2 border-y border-white/10 py-2">
-          <div className="flex flex-col border-b border-white/10 gap-y-2">
+           {/*<div className="flex flex-col border-b border-white/10 gap-y-2">
             <CurrentModel />
             <ApiKey />
           </div>
@@ -38,7 +38,7 @@ export default function ChatSidebar({}: Props) {
           >
             <MdBuild />
             Playground
-          </Link>
+          </Link>*/}
           <ButtonContainer onClick={clearConversations}>
             <MdDeleteOutline />
             Clear Conversations
@@ -46,11 +46,11 @@ export default function ChatSidebar({}: Props) {
 
           <ThemeButton />
         </div>
-
+        {/*
         <Github />
         <span className="text-center text-primary/80">
           Made with ❤️ by Nashex
-        </span>
+        </span> */}
       </div>
     </div>
   );
